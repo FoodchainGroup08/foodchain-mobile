@@ -109,12 +109,16 @@ function RootLayoutNav() {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const [isRouting, setIsRouting] = useState(false);
+  // Tracks whether we've done the initial post-login routing for this session.
+  // Prevents the section-enforcement else-branch from firing before smart routing runs.
+  const hasRoutedRef = useRef(false);
 
   useEffect(() => { bootstrap(); }, []);
 
   useEffect(() => {
     const unsub = on('foodchain:unauthorized', async () => {
       await logout();
+      hasRoutedRef.current = false;
       router.replace('/(auth)/login');
     });
     return unsub;
@@ -146,17 +150,24 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!navState?.key) return;
     if (isLoading) return;
-    const inAuth = segments[0] === '(auth)';
+
     if (!isAuthenticated) {
+      // Reset so the next login gets fresh smart routing
+      hasRoutedRef.current = false;
+      const inAuth = segments[0] === '(auth)';
       if (!inAuth) router.replace('/(auth)/landing');
       return;
     }
+
     const role = user?.role;
     const inCustomer = segments[0] === '(customer)';
     const inKitchen = segments[0] === '(kitchen)';
     const inManager = segments[0] === '(manager)';
     const inAdmin = segments[0] === '(admin)';
-    if (inAuth) {
+
+    if (!hasRoutedRef.current) {
+      // First routing after login or app open — run smart routing once
+      hasRoutedRef.current = true;
       if (role === 'Customer') {
         setIsRouting(true);
         routeCustomerAfterLogin(user!, router).finally(() => setIsRouting(false));
@@ -164,6 +175,7 @@ function RootLayoutNav() {
       else if (role === 'Branch Manager') router.replace('/(manager)/');
       else if (role === 'Admin') router.replace('/(admin)/');
     } else {
+      // Subsequent firings: enforce correct section only
       if (role === 'Customer' && !inCustomer) router.replace('/(customer)/branches');
       else if (role === 'Kitchen Staff' && !inKitchen) router.replace('/(kitchen)/');
       else if (role === 'Branch Manager' && !inManager) router.replace('/(manager)/');
@@ -171,7 +183,7 @@ function RootLayoutNav() {
     }
   }, [navState?.key, isLoading, isAuthenticated, user?.role]);
 
-  if (isLoading || isRouting) {
+  if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
         <ActivityIndicator size="large" color={Colors.amber} />
@@ -180,13 +192,24 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(customer)" />
-      <Stack.Screen name="(kitchen)" />
-      <Stack.Screen name="(manager)" />
-      <Stack.Screen name="(admin)" />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(customer)" />
+        <Stack.Screen name="(kitchen)" />
+        <Stack.Screen name="(manager)" />
+        <Stack.Screen name="(admin)" />
+      </Stack>
+      {isRouting && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: Colors.background,
+          justifyContent: 'center', alignItems: 'center',
+        }}>
+          <ActivityIndicator size="large" color={Colors.amber} />
+        </View>
+      )}
+    </View>
   );
 }
 
