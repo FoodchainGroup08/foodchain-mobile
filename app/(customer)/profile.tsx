@@ -6,11 +6,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '@/stores/authStore';
 import {
   updateProfile, getUserPreferencesV2, saveUserPreferencesV2,
   type SavePreferencesV2Request,
 } from '@/services/api';
+import { BRANCH_KEY_PREFIX } from '../_layout';
 import { Colors, Fonts, Radius } from '@/constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -144,6 +146,14 @@ export default function ProfileScreen() {
   const [address, setAddress] = useState(user?.addressLine ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [storedBranchName, setStoredBranchName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    SecureStore.getItemAsync(BRANCH_KEY_PREFIX + user.id).then(raw => {
+      if (raw) setStoredBranchName(JSON.parse(raw).branchName ?? null);
+    });
+  }, [user?.id]);
 
   // Preferences state
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
@@ -190,8 +200,36 @@ export default function ProfileScreen() {
   const handleSaveProfile = async () => {
     setSavingProfile(true); setProfileSaved(false);
     try {
-      await updateProfile({ name: name.trim(), addressLine: address.trim() || undefined });
+      let lat: number | undefined;
+      let lng: number | undefined;
+
+      // Geocode the address to get coordinates for branch proximity
+      const trimmedAddress = address.trim();
+      if (trimmedAddress) {
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(trimmedAddress)}&format=json&limit=1`;
+          const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+          const data = await res.json();
+          if (data[0]) {
+            lat = parseFloat(data[0].lat);
+            lng = parseFloat(data[0].lon);
+          }
+        } catch {}
+      }
+
+      await updateProfile({
+        name: name.trim(),
+        addressLine: trimmedAddress || undefined,
+        ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+      });
       await refreshUser();
+
+      // Address changed → clear stored branch so the user picks the new closest one
+      if (user?.id && trimmedAddress !== (user.addressLine ?? '')) {
+        await SecureStore.deleteItemAsync(BRANCH_KEY_PREFIX + user.id);
+        setStoredBranchName(null);
+      }
+
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
     } catch {
@@ -199,6 +237,12 @@ export default function ProfileScreen() {
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const handleChangeBranch = async () => {
+    if (user?.id) await SecureStore.deleteItemAsync(BRANCH_KEY_PREFIX + user.id);
+    setStoredBranchName(null);
+    router.push('/(customer)/branches');
   };
 
   const handleSavePreferences = async () => {
@@ -306,6 +350,31 @@ export default function ProfileScreen() {
               ? <ActivityIndicator color={Colors.espresso} />
               : <Text style={styles.saveButtonText}>Save Profile</Text>}
           </TouchableOpacity>
+        </View>
+
+        {/* ── Your Branch ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your Branch</Text>
+          <View style={styles.branchRow}>
+            <View style={styles.branchIconBox}>
+              <Ionicons name="storefront-outline" size={20} color={Colors.amber} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.branchName}>{storedBranchName ?? 'No branch selected'}</Text>
+              <Text style={styles.branchSub}>
+                {storedBranchName
+                  ? 'Your current default branch'
+                  : 'Open the branch list to choose one'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.changeBranchBtn} onPress={handleChangeBranch} activeOpacity={0.8}>
+            <Ionicons name="swap-horizontal-outline" size={16} color={Colors.espresso} />
+            <Text style={styles.changeBranchText}>Change Branch</Text>
+          </TouchableOpacity>
+          <Text style={styles.branchHint}>
+            Updating your address above also resets your branch so we can find the closest one automatically.
+          </Text>
         </View>
 
         {/* ── Food Preferences ── */}
@@ -525,4 +594,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginTop: 20, paddingVertical: 15, alignItems: 'center',
   },
   logoutText: { color: Colors.error, fontSize: 14, fontFamily: Fonts.semiBold },
+
+  branchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  branchIconBox: {
+    width: 40, height: 40, borderRadius: Radius.md,
+    backgroundColor: 'rgba(240,165,0,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  branchName: { fontSize: 15, fontFamily: Fonts.semiBold, color: Colors.espresso },
+  branchSub: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textMuted, marginTop: 2 },
+  changeBranchBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm,
+    paddingVertical: 10, marginBottom: 10,
+  },
+  changeBranchText: { fontSize: 14, fontFamily: Fonts.semiBold, color: Colors.espresso },
+  branchHint: { fontSize: 11, fontFamily: Fonts.regular, color: Colors.textMuted, lineHeight: 16 },
 });

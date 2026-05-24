@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -9,10 +9,14 @@ import { useFonts } from 'expo-font';
 import { ActivityIndicator, View, Text, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '@/stores/authStore';
+import { getBranchesNearby, type User } from '@/services/api';
 import { on } from '@/constants/eventEmitter';
 import { Colors, Fonts } from '@/constants/colors';
 import { StatusBar } from 'expo-status-bar';
+
+export const BRANCH_KEY_PREFIX = 'foodchain_branch_';
 
 (Text as any).defaultProps = (Text as any).defaultProps ?? {};
 (Text as any).defaultProps.style = { fontFamily: Fonts.regular };
@@ -67,6 +71,36 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+async function routeCustomerAfterLogin(user: User, router: ReturnType<typeof useRouter>) {
+  // No saved address with coordinates → onboarding
+  if (user.latitude == null || user.longitude == null) {
+    router.replace('/(customer)/setup-location');
+    return;
+  }
+  // Stored branch from a previous session → go straight to menu
+  const stored = await SecureStore.getItemAsync(BRANCH_KEY_PREFIX + user.id);
+  if (stored) {
+    const { branchId, branchName } = JSON.parse(stored);
+    router.replace({ pathname: '/(customer)/menu', params: { branchId, branchName } } as any);
+    return;
+  }
+  // Auto-select the nearest branch and store it
+  try {
+    const nearby = await getBranchesNearby(user.latitude, user.longitude);
+    const nearest = nearby.find(b => b.isActive) ?? nearby[0];
+    if (nearest) {
+      await SecureStore.setItemAsync(
+        BRANCH_KEY_PREFIX + user.id,
+        JSON.stringify({ branchId: nearest.id, branchName: nearest.name })
+      );
+      router.replace({ pathname: '/(customer)/menu', params: { branchId: nearest.id, branchName: nearest.name } } as any);
+      return;
+    }
+  } catch {}
+  // Fallback: show branch list manually
+  router.replace('/(customer)/branches');
+}
+
 function RootLayoutNav() {
   const { user, isAuthenticated, isLoading, logout, bootstrap } = useAuthStore();
   const segments = useSegments();
@@ -74,6 +108,7 @@ function RootLayoutNav() {
   const navState = useRootNavigationState();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const [isRouting, setIsRouting] = useState(false);
 
   useEffect(() => { bootstrap(); }, []);
 
@@ -122,8 +157,10 @@ function RootLayoutNav() {
     const inManager = segments[0] === '(manager)';
     const inAdmin = segments[0] === '(admin)';
     if (inAuth) {
-      if (role === 'Customer') router.replace('/(customer)/branches');
-      else if (role === 'Kitchen Staff') router.replace('/(kitchen)/');
+      if (role === 'Customer') {
+        setIsRouting(true);
+        routeCustomerAfterLogin(user!, router).finally(() => setIsRouting(false));
+      } else if (role === 'Kitchen Staff') router.replace('/(kitchen)/');
       else if (role === 'Branch Manager') router.replace('/(manager)/');
       else if (role === 'Admin') router.replace('/(admin)/');
     } else {
@@ -134,7 +171,7 @@ function RootLayoutNav() {
     }
   }, [navState?.key, isLoading, isAuthenticated, user?.role]);
 
-  if (isLoading) {
+  if (isLoading || isRouting) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
         <ActivityIndicator size="large" color={Colors.amber} />

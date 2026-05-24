@@ -123,6 +123,7 @@ export default function CustomerLayout() {
           }}
         />
         {/* Stack screens — hidden from tab bar */}
+        <Tabs.Screen name="setup-location" options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="cart" options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="checkout" options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="confirmation" options={{ href: null, headerShown: false }} />
