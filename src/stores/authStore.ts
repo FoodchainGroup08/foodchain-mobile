@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { postLogin, postLogout, postRegister, getMe, updateProfile, postRefreshToken, type User } from '@/services/api';
+import { postLogin, postLogout, postRegister, getMe, updateProfile, postRefreshToken, postGoogleAuth, type User } from '@/services/api';
 
 export const TOKEN_KEY = 'foodchain_token';
 export const REFRESH_TOKEN_KEY = 'foodchain_refresh_token';
@@ -12,6 +12,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<'logged_in' | 'verify_email'>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -57,6 +58,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email, password) => {
     const { token, refreshToken, user } = await postLogin(email, password);
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    if (refreshToken) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+    set({ user, token, isAuthenticated: true });
+  },
+
+  loginWithGoogle: async (credential) => {
+    const { token, refreshToken, user } = await postGoogleAuth(credential);
     await SecureStore.setItemAsync(TOKEN_KEY, token);
     if (refreshToken) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));

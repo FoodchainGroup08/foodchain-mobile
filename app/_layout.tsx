@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -6,8 +6,9 @@ import {
   Poppins_600SemiBold, Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 import { useFonts } from 'expo-font';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
+import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '@/stores/authStore';
 import { on } from '@/constants/eventEmitter';
 import { Colors, Fonts } from '@/constants/colors';
@@ -16,15 +17,63 @@ import { StatusBar } from 'expo-status-bar';
 (Text as any).defaultProps = (Text as any).defaultProps ?? {};
 (Text as any).defaultProps.style = { fontFamily: Fonts.regular };
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
+
+async function registerForPushNotifications(): Promise<string | null> {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'FoodChain Notifications',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#F0A500',
+      sound: 'default',
+    });
+    await Notifications.setNotificationChannelAsync('orders', {
+      name: 'Order Updates',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4CAF7D',
+      sound: 'default',
+    });
+  }
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let finalStatus = existing;
+  if (existing !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') return null;
+
+  try {
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId: 'foodchain-mobile',
+    });
+    return token.data;
+  } catch {
+    return null;
+  }
+}
 
 function RootLayoutNav() {
   const { user, isAuthenticated, isLoading, logout, bootstrap } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const navState = useRootNavigationState();
+  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => { bootstrap(); }, []);
 
@@ -37,7 +86,29 @@ function RootLayoutNav() {
   }, []);
 
   useEffect(() => {
-    // Wait for the navigator to be mounted before attempting any navigation
+    if (!isAuthenticated) return;
+
+    registerForPushNotifications().catch(() => {});
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['adminNotifications'] });
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data as any;
+      if (data?.orderId) {
+        router.push(`/(customer)/order/${data.orderId}` as any);
+      }
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     if (!navState?.key) return;
     if (isLoading) return;
     const inAuth = segments[0] === '(auth)';

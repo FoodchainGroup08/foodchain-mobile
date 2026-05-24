@@ -1,114 +1,181 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from '@/constants/colors';
+import { StatusBar } from 'expo-status-bar';
 
 const { width } = Dimensions.get('window');
 
-const FEATURES = [
-  { icon: '🍽️', title: 'Full Menu, Always Fresh', body: 'Browse every item and price before you order.' },
-  { icon: '📦', title: 'Live Order Tracking', body: 'Follow your order from the kitchen to your door.' },
-  { icon: '⚡', title: 'Quick Checkout', body: 'Cart, address, payment — done in under a minute.' },
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const FEATURES: { icon: IoniconsName; title: string; desc: string }[] = [
+  {
+    icon: 'restaurant-outline',
+    title: 'Browse Menus',
+    desc: "Explore dishes from all branches and find exactly what you're craving.",
+  },
+  {
+    icon: 'bicycle-outline',
+    title: 'Fast Delivery',
+    desc: 'Order delivery, takeaway, or book dine-in at any FoodChain branch.',
+  },
+  {
+    icon: 'star-outline',
+    title: 'Smart Picks',
+    desc: 'Get personalised meal suggestions tailored to your tastes and mood.',
+  },
+  {
+    icon: 'navigate-outline',
+    title: 'Live Tracking',
+    desc: 'Follow your order in real-time from the kitchen straight to you.',
+  },
 ];
+
+function FoodChainLogo() {
+  return (
+    <View style={styles.logoBox}>
+      <View style={styles.logoDiamond} />
+      <View style={styles.logoCircle} />
+    </View>
+  );
+}
 
 export default function LandingScreen() {
   const router = useRouter();
+
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero */}
+    <View style={styles.root}>
+      <StatusBar style="light" />
+
+      {/* ── Hero ── */}
       <View style={styles.hero}>
-        <View style={styles.logoWrap}>
-          <Text style={styles.logoIcon}>🍽️</Text>
-        </View>
-        <Text style={styles.brand}>FoodChain</Text>
-        <Text style={styles.tagline}>Your favourite meals, delivered fast</Text>
-
-        <View style={styles.aiPreview}>
-          <View style={styles.aiHeader}>
-            <Text style={styles.aiHeaderText}>✨ AI Food Assistant</Text>
+        <FoodChainLogo />
+        <Text style={styles.brandName}>FoodChain</Text>
+        <Text style={styles.heroTagline}>Great food, seamlessly delivered</Text>
+        <View style={styles.heroBadgeRow}>
+          <View style={styles.heroBadge}>
+            <Ionicons name="storefront-outline" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.heroBadgeText}>Multi-Branch</Text>
           </View>
-          <View style={styles.aiBody}>
-            {[
-              { name: 'Jollof Rice Combo', price: '₦3,500', reason: 'Hearty and savory — matches your appetite' },
-              { name: 'Grilled Chicken Wrap', price: '₦2,800', reason: 'Light, protein-rich, great for a healthy mood' },
-            ].map((s, i) => (
-              <View key={i} style={styles.aiSuggestion}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.aiSugName}>{s.name}</Text>
-                  <Text style={styles.aiSugReason}>{s.reason}</Text>
-                </View>
-                <Text style={styles.aiSugPrice}>{s.price}</Text>
+          <View style={styles.heroBadge}>
+            <Ionicons name="star-outline" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.heroBadgeText}>Top Rated</Text>
+          </View>
+          <View style={styles.heroBadge}>
+            <Ionicons name="flash-outline" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.heroBadgeText}>Fast Service</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ── Features + CTA ── */}
+      <ScrollView
+        style={styles.sheet}
+        contentContainerStyle={styles.sheetContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.featuresGrid}>
+          {FEATURES.map(f => (
+            <View key={f.title} style={styles.featureCard}>
+              <View style={styles.featureIconBox}>
+                <Ionicons name={f.icon} size={22} color={Colors.amber} />
               </View>
-            ))}
-          </View>
-          <View style={styles.aiDots}>
-            {[0, 1, 2].map(i => (
-              <View key={i} style={[styles.aiDot, i === 0 && styles.aiDotActive]} />
-            ))}
-          </View>
-        </View>
-      </View>
-
-      {/* Features */}
-      <View style={styles.features}>
-        {FEATURES.map((f, i) => (
-          <View key={i} style={styles.featureCard}>
-            <Text style={styles.featureIcon}>{f.icon}</Text>
-            <View style={{ flex: 1 }}>
               <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureBody}>{f.body}</Text>
+              <Text style={styles.featureDesc}>{f.desc}</Text>
             </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      {/* CTAs */}
-      <View style={styles.ctaWrap}>
-        <TouchableOpacity style={styles.ctaPrimary} onPress={() => router.push('/(auth)/register')} activeOpacity={0.85}>
-          <Text style={styles.ctaPrimaryText}>Get Started — It's Free</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.ctaSecondary} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
-          <Text style={styles.ctaSecondaryText}>I already have an account</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.ctaContainer}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryBtnText}>Sign In</Text>
+            <Ionicons name="arrow-forward" size={18} color={Colors.espresso} />
+          </TouchableOpacity>
 
-      <Text style={styles.footer}>FoodChain · Connecting kitchens to customers</Text>
-    </ScrollView>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => router.push('/(auth)/register')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.secondaryBtnText}>Create Account</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.staffNote}>
+            Staff, kitchen & managers — sign in with your assigned credentials
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: Colors.background },
-  container: { paddingBottom: 48 },
+  root: { flex: 1, backgroundColor: Colors.espresso },
 
-  hero: { alignItems: 'center', paddingTop: 72, paddingBottom: 32, paddingHorizontal: 24, backgroundColor: Colors.espresso },
-  logoWrap: { width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.amber, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  logoIcon: { fontSize: 36 },
-  brand: { fontSize: 32, fontFamily: Fonts.bold, color: '#fff', letterSpacing: -0.5 },
-  tagline: { fontSize: 15, fontFamily: Fonts.regular, color: 'rgba(255,255,255,0.7)', marginTop: 6, marginBottom: 28, textAlign: 'center' },
+  hero: {
+    paddingTop: 64, paddingBottom: 36, paddingHorizontal: 24, alignItems: 'center',
+    backgroundColor: Colors.espresso,
+  },
+  logoBox: {
+    width: 72, height: 72, borderRadius: 20,
+    backgroundColor: 'rgba(240,165,0,0.15)',
+    borderWidth: 2, borderColor: 'rgba(240,165,0,0.35)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  },
+  logoDiamond: {
+    position: 'absolute', width: 32, height: 32, backgroundColor: Colors.amber,
+    transform: [{ rotate: '45deg' }], borderRadius: 4,
+  },
+  logoCircle: {
+    position: 'absolute', width: 14, height: 14, borderRadius: 7,
+    backgroundColor: Colors.espresso,
+  },
+  brandName: { fontSize: 30, fontFamily: Fonts.bold, color: '#fff', letterSpacing: 0.5 },
+  heroTagline: {
+    fontSize: 14, fontFamily: Fonts.regular, color: 'rgba(255,255,255,0.65)',
+    marginTop: 6, textAlign: 'center',
+  },
+  heroBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 18 },
+  heroBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.full,
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  heroBadgeText: { fontSize: 12, fontFamily: Fonts.medium, color: 'rgba(255,255,255,0.85)' },
 
-  aiPreview: { width: width - 48, backgroundColor: '#fff', borderRadius: Radius.xl, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
-  aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: Colors.amberLight, borderBottomWidth: 1, borderBottomColor: 'rgba(240,165,0,0.2)' },
-  aiHeaderText: { fontSize: 13, fontFamily: Fonts.semiBold, color: Colors.espresso },
-  aiBody: { padding: 12, gap: 10 },
-  aiSuggestion: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  aiSugName: { fontSize: 13, fontFamily: Fonts.semiBold, color: Colors.espresso },
-  aiSugReason: { fontSize: 11, fontFamily: Fonts.regular, color: Colors.textMuted, marginTop: 2 },
-  aiSugPrice: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.amber },
-  aiDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingBottom: 12 },
-  aiDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.muted },
-  aiDotActive: { backgroundColor: Colors.amber, width: 16 },
+  sheet: { flex: 1, backgroundColor: Colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40 },
 
-  features: { padding: 20, gap: 12 },
-  featureCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: Colors.border },
-  featureIcon: { fontSize: 26, marginTop: 2 },
-  featureTitle: { fontSize: 14, fontFamily: Fonts.semiBold, color: Colors.espresso },
-  featureBody: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textMuted, marginTop: 3, lineHeight: 17 },
+  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
+  featureCard: {
+    width: (width - 44) / 2,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  featureIconBox: {
+    width: 40, height: 40, borderRadius: Radius.md,
+    backgroundColor: 'rgba(240,165,0,0.12)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+  },
+  featureTitle: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.espresso, marginBottom: 4 },
+  featureDesc: { fontSize: 11, fontFamily: Fonts.regular, color: Colors.textMuted, lineHeight: 16 },
 
-  ctaWrap: { paddingHorizontal: 20, gap: 12, marginTop: 4 },
-  ctaPrimary: { backgroundColor: Colors.amber, borderRadius: Radius.lg, paddingVertical: 17, alignItems: 'center', shadowColor: Colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
-  ctaPrimaryText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.espresso },
-  ctaSecondary: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.lg, paddingVertical: 15, alignItems: 'center' },
-  ctaSecondaryText: { fontSize: 15, fontFamily: Fonts.medium, color: Colors.espresso },
-
-  footer: { textAlign: 'center', fontSize: 11, fontFamily: Fonts.regular, color: Colors.textLight, marginTop: 24 },
+  ctaContainer: { gap: 12 },
+  primaryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.amber, borderRadius: Radius.md, paddingVertical: 16,
+    shadowColor: Colors.amber, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
+  },
+  primaryBtnText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.espresso },
+  secondaryBtn: {
+    backgroundColor: Colors.surface, borderRadius: Radius.md, paddingVertical: 16,
+    alignItems: 'center', borderWidth: 1.5, borderColor: Colors.espresso,
+  },
+  secondaryBtnText: { fontSize: 16, fontFamily: Fonts.semiBold, color: Colors.espresso },
+  staffNote: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textMuted, textAlign: 'center' },
 });

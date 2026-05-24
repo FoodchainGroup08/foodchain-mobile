@@ -2,7 +2,9 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { emit } from '@/constants/eventEmitter';
 
-const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080') + '/api/v1';
+const API_HOST = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080';
+const BASE_URL = API_HOST + '/api/v1';
+const BASE_URL_V2 = API_HOST + '/api/v2';
 export const TOKEN_KEY = 'foodchain_token';
 export const REFRESH_TOKEN_KEY = 'foodchain_refresh_token';
 
@@ -207,9 +209,11 @@ export interface AdminNotification {
 }
 
 export interface FoodSuggestionRequest {
-  branchId: string; branchName: string; budget?: number;
+  branchId: string; branchName: string; budget?: number; budgetUnlimited?: boolean;
   mealType?: 'breakfast'|'lunch'|'dinner'|'snack'|'dessert';
-  appetite?: 'light'|'heavy'; dietaryPreferences?: string[];
+  appetite?: 'light'|'moderate'|'heavy'; dietaryPreferences?: string[];
+  dietaryRestrictions?: string[]; cuisinePreferences?: string[];
+  spiceLevel?: string | null; moods?: string[];
   peopleCount?: number; fulfillmentType?: 'pickup'|'delivery'|'dine-in'; limit?: number;
 }
 
@@ -365,6 +369,13 @@ export const postResendVerification = (email: string) =>
 export const postRefreshToken = (refreshToken: string): Promise<AuthResponse> =>
   apiClient.post<any>('/auth/refresh', { refreshToken }).then(r => ({ accessToken: r.data.accessToken as string, refreshToken: r.data.refreshToken as string, tokenType: r.data.tokenType as string, expiresIn: r.data.expiresIn as number, user: mapUser(r.data.user) }));
 
+export const postGoogleAuth = (credential: string) =>
+  apiClient.post<any>('/auth/google', { credential }).then(r => ({
+    token: (r.data.accessToken ?? r.data.token) as string,
+    refreshToken: r.data.refreshToken as string | undefined,
+    user: mapUser(r.data.user),
+  }));
+
 // ─── Branches ─────────────────────────────────────────────────────────────────
 
 export const getBranches = (): Promise<Branch[]> =>
@@ -439,7 +450,7 @@ export const updateCategory = (id: string, data: { name?: string; displayOrder?:
   apiClient.put<any>(`/menu/categories/${id}`, data).then(r => r.data);
 
 export const getFoodSuggestions = (request: FoodSuggestionRequest): Promise<AiRecommendationResponse> =>
-  apiClient.post<AiRecommendationResponse>('/menu/suggestions', request).then(r => r.data);
+  apiClient.post<AiRecommendationResponse>('/menu/recommendations', request, { baseURL: BASE_URL_V2 }).then(r => r.data);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
@@ -576,3 +587,68 @@ export const markAllNotificationsRead = (): Promise<number> =>
 
 export const deleteNotification = (id: number): Promise<void> =>
   apiClient.delete(`/notifications/${id}`).then(r => r.data);
+
+// ─── User Preferences V2 ──────────────────────────────────────────────────────
+
+export interface UserPreferencesV2 {
+  userId?: string;
+  dietaryRestrictions: string[];
+  cuisinePreferences: string[];
+  spiceLevel: string | null;
+  defaultBudget?: number;
+  budgetUnlimited: boolean;
+  preferencesCompleted: boolean;
+  healthGoal?: string | null;
+  foodAllergies?: string[];
+  tastePreferences?: string[];
+  dislikedIngredients?: string[];
+  appetiteSize?: string | null;
+  usualMealTimes?: string[];
+  orderFrequency?: string | null;
+  typicalGroupSize?: string | null;
+  updatedAt?: string;
+}
+
+export interface SavePreferencesV2Request {
+  dietaryRestrictions: string[];
+  cuisinePreferences: string[];
+  spiceLevel: string | null;
+  defaultBudget?: number;
+  budgetUnlimited: boolean;
+  healthGoal?: string | null;
+  foodAllergies?: string[];
+  tastePreferences?: string[];
+  dislikedIngredients?: string[];
+  appetiteSize?: string | null;
+  usualMealTimes?: string[];
+  orderFrequency?: string | null;
+  typicalGroupSize?: string | null;
+}
+
+export const getUserPreferencesV2 = (): Promise<UserPreferencesV2> =>
+  apiClient.get<UserPreferencesV2>('/users/preferences', { baseURL: BASE_URL_V2 }).then(r => r.data);
+
+export const saveUserPreferencesV2 = (prefs: SavePreferencesV2Request): Promise<UserPreferencesV2> =>
+  apiClient.post<UserPreferencesV2>('/users/preferences', prefs, { baseURL: BASE_URL_V2 }).then(r => r.data);
+
+// ─── Paystack payments ────────────────────────────────────────────────────────
+
+export interface InitializePaymentRequest {
+  orderId: string; email: string; amount: number;
+}
+
+export interface InitializePaymentResponse {
+  authorizationUrl: string; accessCode: string; reference: string; orderId: string;
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  paymentStatus: 'PAID' | 'FAILED' | 'INITIATED' | 'PENDING';
+  orderStatus: string; reference: string; orderId: string; message: string;
+}
+
+export const initializePaystackPayment = (req: InitializePaymentRequest): Promise<InitializePaymentResponse> =>
+  apiClient.post<InitializePaymentResponse>('/payments/paystack/initialize', req).then(r => r.data);
+
+export const verifyPaystackPayment = (reference: string): Promise<VerifyPaymentResponse> =>
+  apiClient.get<VerifyPaymentResponse>(`/payments/paystack/verify/${reference}`).then(r => r.data);
