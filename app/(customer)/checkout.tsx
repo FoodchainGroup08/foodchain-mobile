@@ -129,18 +129,29 @@ export default function CheckoutScreen() {
           orderId: order.id,
           email: user?.email ?? '',
           amount: total,
+          callbackUrl: 'foodchain://payment-callback',
         });
         setPendingRef(payInit.reference);
         setPendingOrderId(order.id);
         setLoading(false);
 
-        // Open Paystack hosted checkout in browser
-        await WebBrowser.openBrowserAsync(payInit.authorizationUrl, {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        });
+        // Open Paystack in an auth session so it auto-closes when the deep link fires
+        const result = await WebBrowser.openAuthSessionAsync(
+          payInit.authorizationUrl,
+          'foodchain://',
+        );
 
-        // Browser closed — verify payment
-        await runVerify(payInit.reference, order.id);
+        // Extract reference from the redirect URL if Paystack appended it
+        let ref = payInit.reference;
+        if (result.type === 'success' && result.url) {
+          try {
+            const params = new URL(result.url).searchParams;
+            ref = params.get('reference') || params.get('trxref') || ref;
+          } catch {}
+        }
+
+        // Verify — works whether the browser closed via deep link or manually
+        await runVerify(ref, order.id);
       } else {
         // Cash / transfer — goes straight to kitchen
         clearCart();
@@ -298,7 +309,7 @@ export default function CheckoutScreen() {
           <View style={styles.paystackNote}>
             <Ionicons name="shield-checkmark-outline" size={14} color={Colors.sageGreen} />
             <Text style={styles.paystackNoteText}>
-              You'll be redirected to Paystack to complete payment securely. Close the page when done to confirm.
+              You'll be redirected to Paystack to complete payment securely. The app will return automatically when done.
             </Text>
           </View>
         )}

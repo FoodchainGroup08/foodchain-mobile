@@ -634,7 +634,7 @@ export const saveUserPreferencesV2 = (prefs: SavePreferencesV2Request): Promise<
 // ─── Paystack payments ────────────────────────────────────────────────────────
 
 export interface InitializePaymentRequest {
-  orderId: string; email: string; amount: number;
+  orderId: string; email: string; amount: number; callbackUrl?: string;
 }
 
 export interface InitializePaymentResponse {
